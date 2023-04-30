@@ -1,0 +1,5 @@
+noise_osc.ntkdigunit
+build/
+.DS_Store
+Thumbs.db
+.vscode/
