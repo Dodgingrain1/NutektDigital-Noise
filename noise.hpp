@@ -2,7 +2,7 @@
 /*
     BSD 3-Clause License
 
-    Copyright (c) 2018, KORG INC.
+    Copyright (c) 2018, KORG INC., 2023 Christopher Brand
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
