@@ -67,13 +67,13 @@ void OSC_INIT(uint32_t platform, uint32_t api)
   s_state.counter=0.0f;
   s_state.blueCounter=0.f;
 
-  brownFilter.mCoeffs.setFOLP(tan(PI* brownFilter.mCoeffs.wc(16.35f,1.f/48000.f)));
-  violetFilter.mCoeffs.setFOHP(tan(PI* violetFilter.mCoeffs.wc(16744.04f,1.f/48000.f)));
+  brownFilter.mCoeffs.setFOLP(tan(PI* brownFilter.mCoeffs.wc(16.35f, k_samplerate_recipf)));
+  violetFilter.mCoeffs.setFOHP(tan(PI* violetFilter.mCoeffs.wc(16744.04f, k_samplerate_recipf)));
 
-  greyLPFilter.mCoeffs.setSOLP(tan(PI* greyLPFilter.mCoeffs.wc(550.f,1.f/48000.f)), 1.f);
-  greyHP1Filter.mCoeffs.setSOHP(tan(PI* greyHP1Filter.mCoeffs.wc(4000.f,1.f/48000.f)), 1.f);  
-  greyHP2Filter.mCoeffs.setSOHP(tan(PI* greyHP2Filter.mCoeffs.wc(4000.f,1.f/48000.f)), 1.f);  
-  greyHP3Filter.mCoeffs.setSOHP(tan(PI* greyHP3Filter.mCoeffs.wc(4000.f,1.f/48000.f)), 1.f);  
+  greyLPFilter.mCoeffs.setSOLP(tan(PI* greyLPFilter.mCoeffs.wc(550.f,k_samplerate_recipf)), 1.f);
+  greyHP1Filter.mCoeffs.setSOHP(tan(PI* greyHP1Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
+  greyHP2Filter.mCoeffs.setSOHP(tan(PI* greyHP2Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
+  greyHP3Filter.mCoeffs.setSOHP(tan(PI* greyHP3Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
 
   // prevents the compiler from complaining
   (void)platform;
