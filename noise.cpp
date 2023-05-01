@@ -97,50 +97,29 @@ void OSC_CYCLE(const user_osc_param_t * const params,
     }
   }
   else if (osc == k_flag_pink){
-    // Voss - McCartney algorithm, this might be able to be implemented cleaner vs the or's
-    // get our current counter frame and set the counter frame after processing
-    float counter = s_state.counter;
-    s_state.counter= s_state.counter + (float)(frames % 128);
-    if (s_state.counter>127.0f){
-      s_state.counter = 0.f;
+    // Voss - McCartney algorithm, this might be able to be implemented cleaner
+    uint8_t counter = s_state.counter;
+    s_state.counter= s_state.counter + (frames % 128);    
+    if (s_state.counter>127){
+      s_state.counter = 0;
     }
 
     for (; y <=y_e; ){
       float osc_white_total=_osc_white(); // row -1 aadded in every counter
 
-      if (counter==0 || counter==2 || counter==4 || counter==6|| counter==8 || counter==10 || 
-          counter==12 || counter==14 || counter==16 || counter==18 || counter==20 || counter==22 || 
-          counter==24 || counter==26 || counter==28 || counter==30 || counter==32 || counter==34 ||
-          counter==36 || counter==38 || counter==40 || counter==42 || counter==44 || counter==46 ||
-          counter==48 || counter==50 || counter==52 || counter==54 || counter==56 || counter==58 ||
-          counter==60 || counter==62 || counter==64 || counter==66 || counter==68 || counter==70 ||
-          counter==72 || counter==74 || counter==76 || counter==78 || counter==80 || counter==82 ||
-          counter==84 || counter==86 || counter==88 || counter==90 || counter==92 || counter==94 ||
-          counter==96 || counter==98 || counter==100 || counter==102 || counter==104 || counter==106 ||
-          counter==108 || counter==110 || counter==112 || counter==114 || counter==116 || counter==118 ||
-          counter==120 || counter==122 || counter==124 || counter==126){
+      if (counter % 2 == 0){
         s_state.row_0=_osc_white();
       }
-      else if (counter==1 || counter==5 || counter==9 || counter==13 || counter==17 || 
-               counter==21 || counter==25 || counter==29 || counter==33 || counter==37 ||
-               counter==41 || counter==45 || counter==49 || counter==53 || counter==57 ||
-               counter==61 || counter==65 || counter==69 || counter==73 || counter==77 ||
-               counter==81 || counter==85 || counter==89 || counter==93 || counter==97 ||
-               counter==101 || counter==105 || counter==109 || counter==113 || counter==117 ||
-               counter==121 || counter==125){
+      else if ((counter-1) % 4 == 0){
         s_state.row_1=_osc_white();        
       }
-      else if (counter==3 || counter == 11 || counter == 19 || counter==27 || counter==35 ||
-               counter==43 || counter==51 || counter==59 || counter==67 || counter==75 || 
-               counter==83 || counter==91 || counter==99 || counter==107 || counter==115 ||
-               counter==123){
+      else if ((counter -3) % 8 == 0){
         s_state.row_2=_osc_white();
       }
-      else if (counter==7 || counter==23 || counter==39 || counter== 55 || counter==71 ||
-               counter==87 || counter==103 || counter==119){
+      else if ((counter - 7) % 16 == 0){
         s_state.row_3=_osc_white();
       }
-      else if (counter==15 || counter==47 || counter==79 || counter==111){
+      else if ((counter - 15) % 32 == 0){
         s_state.row_4=_osc_white();
       }
       else if (counter==33 || counter==97){
@@ -166,51 +145,30 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   }
   else if (osc == k_flag_blue){
     // we are going to use pink noise and take the difference of successive samples, aka, pink noise with a first differential operator
-    // Voss - McCartney algorithm, this might be able to be implemented cleaner vs the or's
-    // get our current counter frame and set the counter frame after processing
+    // Voss - McCartney algorithm, this might be able to be implemented cleaner
 
-    float blueCounter = s_state.blueCounter;
-    s_state.blueCounter = s_state.blueCounter + (float)(frames % 128);
-    if (s_state.blueCounter > 127){
-      s_state.blueCounter = 0.f;
+    uint8_t blueCounter = s_state.counter;
+    s_state.counter= s_state.counter + (frames % 128);    
+    if (s_state.counter>127){
+      s_state.counter = 0;
     }
 
     for (; y <= y_e;){
       float osc_white_total=_osc_white(); // row -1 aadded in every counter
 
-      if (blueCounter==0 || blueCounter==2 || blueCounter==4 || blueCounter==6|| blueCounter==8 || blueCounter==10 || 
-          blueCounter==12 || blueCounter==14 || blueCounter==16 || blueCounter==18 || blueCounter==20 || blueCounter==22 || 
-          blueCounter==24 || blueCounter==26 || blueCounter==28 || blueCounter==30 || blueCounter==32 || blueCounter==34 ||
-          blueCounter==36 || blueCounter==38 || blueCounter==40 || blueCounter==42 || blueCounter==44 || blueCounter==46 ||
-          blueCounter==48 || blueCounter==50 || blueCounter==52 || blueCounter==54 || blueCounter==56 || blueCounter==58 ||
-          blueCounter==60 || blueCounter==62 || blueCounter==64 || blueCounter==66 || blueCounter==68 || blueCounter==70 ||
-          blueCounter==72 || blueCounter==74 || blueCounter==76 || blueCounter==78 || blueCounter==80 || blueCounter==82 ||
-          blueCounter==84 || blueCounter==86 || blueCounter==88 || blueCounter==90 || blueCounter==92 || blueCounter==94 ||
-          blueCounter==96 || blueCounter==98 || blueCounter==100 || blueCounter==102 || blueCounter==104 || blueCounter==106 ||
-          blueCounter==108 || blueCounter==110 || blueCounter==112 || blueCounter==114 || blueCounter==116 || blueCounter==118 ||
-          blueCounter==120 || blueCounter==122 || blueCounter==124 || blueCounter==126){
+      if (blueCounter % 2 == 0){
         s_state.blueRow_0=_osc_white();
       }
-      else if (blueCounter==1 || blueCounter==5 || blueCounter==9 || blueCounter==13 || blueCounter==17 || 
-               blueCounter==21 || blueCounter==25 || blueCounter==29 || blueCounter==33 || blueCounter==37 ||
-               blueCounter==41 || blueCounter==45 || blueCounter==49 || blueCounter==53 || blueCounter==57 ||
-               blueCounter==61 || blueCounter==65 || blueCounter==69 || blueCounter==73 || blueCounter==77 ||
-               blueCounter==81 || blueCounter==85 || blueCounter==89 || blueCounter==93 || blueCounter==97 ||
-               blueCounter==101 || blueCounter==105 || blueCounter==109 || blueCounter==113 || blueCounter==117 ||
-               blueCounter==121 || blueCounter==125){
+      else if ((blueCounter - 1) % 4 ==0){
         s_state.blueRow_1=_osc_white();        
       }
-      else if (blueCounter==3 || blueCounter == 11 || blueCounter == 19 || blueCounter==27 || blueCounter==35 ||
-               blueCounter==43 || blueCounter==51 || blueCounter==59 || blueCounter==67 || blueCounter==75 || 
-               blueCounter==83 || blueCounter==91 || blueCounter==99 || blueCounter==107 || blueCounter==115 ||
-               blueCounter==123){
+      else if ((blueCounter - 3) % 8 == 0){
         s_state.blueRow_2=_osc_white();
       }
-      else if (blueCounter==7 || blueCounter==23 || blueCounter==39 || blueCounter== 55 || blueCounter==71 ||
-               blueCounter==87 || blueCounter==103 || blueCounter==119){
+      else if ((blueCounter - 7) % 16 == 0){
         s_state.blueRow_3=_osc_white();
       }
-      else if (blueCounter==15 || blueCounter==47 || blueCounter==79 || blueCounter==111){
+      else if ((blueCounter - 15) % 32 == 0){
         s_state.blueRow_4=_osc_white();
       }
       else if (blueCounter==33 || blueCounter==97){

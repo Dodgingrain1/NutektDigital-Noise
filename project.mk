@@ -6,7 +6,7 @@ PROJECT = noise_osc
 
 UCSRC =
 
-UCXXSRC = noise1.cpp
+UCXXSRC = noise.cpp
 
 UINCDIR =
 
