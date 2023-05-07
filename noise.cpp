@@ -35,46 +35,17 @@
  * File: noise.cpp
  *
  * Noise oscillator
- *
- *     Implemented:
- *      - white
- *      - pink
- *      - brown
- *      - blue
- *      - violet
- *      - grey
- *     To Implement:
- *      - cleaner implementation of pink noise (blue noise)
  */
 
 #include "userosc.h"
 #include "noise.hpp"
 #include "dsp/biquad.hpp"
+#include "antialiasingfilter.hpp"
 
-static State s_state;
-static dsp::BiQuad brownFilter;
-static dsp::BiQuad violetFilter;
-
-static dsp::BiQuad greyLPFilter;
-static dsp::BiQuad greyHP1Filter;
-static dsp::BiQuad greyHP2Filter;
-static dsp::BiQuad greyHP3Filter;
+static Noise s_Noise;
 
 void OSC_INIT(uint32_t platform, uint32_t api)
-{
-  s_state.flags = k_flags_none;
-  s_state.noise_type = k_flag_white;
-  s_state.counter=0.0f;
-  s_state.blueCounter=0.f;
-
-  brownFilter.mCoeffs.setFOLP(tan(PI* brownFilter.mCoeffs.wc(16.35f, k_samplerate_recipf)));
-  violetFilter.mCoeffs.setFOHP(tan(PI* violetFilter.mCoeffs.wc(16744.04f, k_samplerate_recipf)));
-
-  greyLPFilter.mCoeffs.setSOLP(tan(PI* greyLPFilter.mCoeffs.wc(550.f,k_samplerate_recipf)), 1.f);
-  greyHP1Filter.mCoeffs.setSOHP(tan(PI* greyHP1Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
-  greyHP2Filter.mCoeffs.setSOHP(tan(PI* greyHP2Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
-  greyHP3Filter.mCoeffs.setSOHP(tan(PI* greyHP3Filter.mCoeffs.wc(4000.f,k_samplerate_recipf)), 1.f);  
-
+{ 
   // prevents the compiler from complaining
   (void)platform;
   (void)api;
@@ -84,132 +55,242 @@ void OSC_CYCLE(const user_osc_param_t * const params,
                int32_t *yn,
                const uint32_t frames)
 {
-
-  const uint8_t flags = s_state.flags;
-  const uint8_t osc = s_state.noise_type;
+  Noise::State &s = s_Noise.state;
+  const uint8_t flags = s.flags;
+  const uint8_t osc = s.noise_type;
 
   q31_t * __restrict y = (q31_t *)yn;
   const q31_t * y_e = y + frames;
 
-  if (osc == k_flag_white){
-    for (; y <=y_e; ){
-      *(y++) = f32_to_q31(_osc_white());
-    }
-  }
-  else if (osc == k_flag_pink){
-    // Voss - McCartney algorithm, this might be able to be implemented cleaner
-    uint8_t counter = s_state.counter;
-    s_state.counter= s_state.counter + (frames % 128);    
-    if (s_state.counter>127){
-      s_state.counter = 0;
+  if (osc == Noise::k_flag_white){
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
+
+    // fill preUpsampleBuffer
+    for (int i = 0; i < frames; i++){
+      preUpSampleBuffer[i] = osc_white();
     }
 
-    for (; y <=y_e; ){
-      float osc_white_total=_osc_white(); // row -1 aadded in every counter
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
+    }    
+  }
+  else if (osc == Noise::k_flag_pink){
+    // Voss - McCartney algorithm, this might be able to be implemented cleaner 
+    // or we could do a -3db/oct filter on white noise
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
+
+    uint8_t counter = s.counter;
+    s.counter= s.counter + (frames % 128);    
+    if (s.counter>127){
+      s.counter = 0;
+    }
+
+    // fill preUpSampleBuffer
+    for (int i = 0; i < frames; i++){
+      float osc_white_total=osc_white(); // row -1 aadded in every counter
 
       if (counter % 2 == 0){
-        s_state.row_0=_osc_white();
+        s.row_0=osc_white();
       }
       else if ((counter-1) % 4 == 0){
-        s_state.row_1=_osc_white();        
+        s.row_1=osc_white();        
       }
       else if ((counter -3) % 8 == 0){
-        s_state.row_2=_osc_white();
+        s.row_2=osc_white();
       }
       else if ((counter - 7) % 16 == 0){
-        s_state.row_3=_osc_white();
+        s.row_3=osc_white();
       }
       else if ((counter - 15) % 32 == 0){
-        s_state.row_4=_osc_white();
+        s.row_4=osc_white();
       }
       else if (counter==33 || counter==97){
-        s_state.row_5=_osc_white();
+        s.row_5=osc_white();
       }
       else if (counter==63) {
-        s_state.row_6=_osc_white();
+        s.row_6=osc_white();
       }
-      osc_white_total +=s_state.row_0 + s_state.row_1 + s_state.row_2 + s_state.row_3 + s_state.row_4 + s_state.row_5 +s_state.row_6; 
-      *(y++) = f32_to_q31(osc_white_total/8.f);
+      osc_white_total +=s.row_0 + s.row_1 + s.row_2 + s.row_3 + s.row_4 + s.row_5 +s.row_6; 
+      preUpSampleBuffer[i]=(osc_white_total/8.f);
 
       counter+=1;
       if (counter>127.f){
         counter = 0.f;
       }
+    }
+
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
+    }
+  }
+  else if (osc == Noise::k_flag_brown){
+    // 6.02db/octave low pass filter on white noise, use first order filter
+    const float ampAdjust = 1.99f;  // brown is a bit quiet so lets boost it some
+
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
+
+    // fill preUpsampleBuffer
+    for (int i = 0; i < frames; i++){
+      preUpSampleBuffer[i] = ampAdjust * s_Noise.brownFilter.process_fo(osc_white());
+    }
+
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
     }    
   }
-  else if (osc == k_flag_brown){
-    // 6.02db/octave low pass filter on white noise, use first order filter
-    for (; y <=y_e; ){
-      *(y++) = f32_to_q31(brownFilter.process_fo(_osc_white()));
-    }
-  }
-  else if (osc == k_flag_blue){
+  else if (osc == Noise::k_flag_blue){
     // we are going to use pink noise and take the difference of successive samples, aka, pink noise with a first differential operator
     // Voss - McCartney algorithm, this might be able to be implemented cleaner
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
 
-    uint8_t blueCounter = s_state.counter;
-    s_state.counter= s_state.counter + (frames % 128);    
-    if (s_state.counter>127){
-      s_state.counter = 0;
+    uint8_t blueCounter = s.counter;
+    s.counter= s.counter + (frames % 128);    
+    if (s.counter>127){
+      s.counter = 0;
     }
 
-    for (; y <= y_e;){
-      float osc_white_total=_osc_white(); // row -1 aadded in every counter
+    // fill preUpSampleBuffer
+    for (int i = 0; i < frames; i++){
+      float osc_white_total=osc_white(); // row -1 aadded in every counter
 
       if (blueCounter % 2 == 0){
-        s_state.blueRow_0=_osc_white();
+        s.blueRow_0=osc_white();
       }
-      else if ((blueCounter - 1) % 4 ==0){
-        s_state.blueRow_1=_osc_white();        
+      else if ((blueCounter-1) % 4 == 0){
+        s.blueRow_1=osc_white();        
       }
-      else if ((blueCounter - 3) % 8 == 0){
-        s_state.blueRow_2=_osc_white();
+      else if ((blueCounter -3) % 8 == 0){
+        s.blueRow_2=osc_white();
       }
       else if ((blueCounter - 7) % 16 == 0){
-        s_state.blueRow_3=_osc_white();
+        s.blueRow_3=osc_white();
       }
       else if ((blueCounter - 15) % 32 == 0){
-        s_state.blueRow_4=_osc_white();
+        s.blueRow_4=osc_white();
       }
       else if (blueCounter==33 || blueCounter==97){
-        s_state.blueRow_5=_osc_white();
+        s.blueRow_5=osc_white();
       }
       else if (blueCounter==63) {
-        s_state.blueRow_6=_osc_white();
+        s.blueRow_6=osc_white();
       }
-      osc_white_total +=s_state.blueRow_0 + s_state.blueRow_1 + s_state.blueRow_2 + s_state.blueRow_3 + s_state.blueRow_4 + s_state.blueRow_5 + s_state.blueRow_6;
-
-      *(y++) = f32_to_q31( (osc_white_total/8.f) - s_state.prev_sample);
-      s_state.prev_sample = osc_white_total/8.f;
+      osc_white_total +=s.blueRow_0 + s.blueRow_1 + s.blueRow_2 + s.blueRow_3 + s.blueRow_4 + s.blueRow_5 +s.blueRow_6; 
+      preUpSampleBuffer[i]=(osc_white_total/8.f) - s.prev_sample;
+      s.prev_sample = osc_white_total/8.f;
 
       blueCounter+=1;
       if (blueCounter>127.f){
         blueCounter = 0.f;
       }
     }
+
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
+    }
   }
-  else if (osc == k_flag_violet){
+  else if (osc == Noise::k_flag_violet){
    // 6.02db/octave high pass filter on white noise, use first order filter
-    for (; y <=y_e; ){
-      *(y++) = f32_to_q31(violetFilter.process_fo(_osc_white()));
-    } 
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
+
+    // fill preUpsampleBuffer
+    for (int i = 0; i < frames; i++){
+      preUpSampleBuffer[i] = s_Noise.violetFilter.process_fo(osc_white());
+    }
+
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
+    }    
   }
   else{
     // grey
-    for (; y <=y_e; ){
+    float preUpSampleBuffer [frames] = {0};
+    float postUpSampleBuffer [frames *2] = {0};
+    float postDownSampleBuffer [frames] = {0};
+
+  // fill preUpsampleBuffer
+    for (int i = 0; i < frames; i++){
+      float whiteNoise = osc_white();
       float intermediate;
       
-      intermediate = greyLPFilter.process_so(_osc_white());
-      intermediate += greyHP3Filter.process_so(greyHP2Filter.process_so(greyHP1Filter.process_so(_osc_white())));
+      intermediate = s_Noise.greyLPFilter.process_so(whiteNoise);
+      intermediate += s_Noise.greyHP3Filter.process_so(s_Noise.greyHP2Filter.process_so(s_Noise.greyHP1Filter.process_so(whiteNoise)));
 
-      *(y++) = f32_to_q31(intermediate/2.f);
+      preUpSampleBuffer[i] = intermediate/2.f;
+    }
+
+    // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
+    s_Noise.aAFilter.upsample(preUpSampleBuffer, postUpSampleBuffer, frames);
+
+    // do any processing needed (none)
+
+    // decimate to postDownsampleBuffer (1/2x, going from 96kHz to 48kHz)
+    s_Noise.aAFilter.decimate(postUpSampleBuffer, postDownSampleBuffer, frames);
+
+    // copy into real buffer
+    for (int i = 0; i < frames; i++){
+      *(y++) = f32_to_q31(postDownSampleBuffer[i]);
     }
   }
 }
 
 void OSC_NOTEON(const user_osc_param_t * const params)
 {  
-  s_state.flags = k_flag_reset;
+  s_Noise.state.flags |= Noise::k_flag_reset;
 }
 
 void OSC_NOTEOFF(const user_osc_param_t * const params)
@@ -220,6 +301,8 @@ void OSC_NOTEOFF(const user_osc_param_t * const params)
 
 void OSC_PARAM(uint16_t index, uint16_t value)
 {  
+  Noise::State &s = s_Noise.state;
+
   switch (index) {
   case k_user_osc_param_id1:
   case k_user_osc_param_id2:    
@@ -236,22 +319,22 @@ void OSC_PARAM(uint16_t index, uint16_t value)
       const float user_osc_param = param_val_to_f32(value);
       
       if (user_osc_param<=.170){
-        s_state.noise_type = k_flag_white;
+        s.noise_type = Noise::k_flag_white;
       }
       else if (user_osc_param>.170 && user_osc_param<=.340){
-        s_state.noise_type = k_flag_pink;
+        s.noise_type = Noise::k_flag_pink;
       }
       else if (user_osc_param>.340 && user_osc_param<=.510){
-        s_state.noise_type = k_flag_brown;
+        s.noise_type = Noise::k_flag_brown;
       }
       else if (user_osc_param>.510 && user_osc_param<=.680){
-        s_state.noise_type = k_flag_blue;
+        s.noise_type = Noise::k_flag_blue;
       }
       else if (user_osc_param>.680 && user_osc_param<=.850){
-        s_state.noise_type = k_flag_violet;
+        s.noise_type = Noise::k_flag_violet;
       }
       else{
-        s_state.noise_type = k_flag_grey;
+        s.noise_type = Noise::k_flag_grey;
       }
       break;
     }
