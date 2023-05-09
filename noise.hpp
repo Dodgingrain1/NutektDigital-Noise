@@ -111,7 +111,7 @@ struct Noise{
     greyHP2Filter.mCoeffs.setSOHP(tan(PI* greyHP2Filter.mCoeffs.wc(10000.f,k_samplerate_recipf)), 1.f);  
     greyHP3Filter.mCoeffs.setSOHP(tan(PI* greyHP3Filter.mCoeffs.wc(10000.f,k_samplerate_recipf)), 1.f);  
 
-    aAFilter.init(24000.f,1.f);
+    aAFilter.init(24000.f);
   }
 
   State state;

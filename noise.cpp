@@ -174,6 +174,8 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   else if (osc == Noise::k_flag_blue){
     // we are going to use pink noise and take the difference of successive samples, aka, pink noise with a first differential operator
     // Voss - McCartney algorithm, this might be able to be implemented cleaner
+    const float ampAdjust = 1.99f;  // lets boost it some
+
     float preUpSampleBuffer [frames] = {0};
     float postUpSampleBuffer [frames *2] = {0};
     float postDownSampleBuffer [frames] = {0};
@@ -210,7 +212,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
         s.blueRow_6=osc_white();
       }
       osc_white_total +=s.blueRow_0 + s.blueRow_1 + s.blueRow_2 + s.blueRow_3 + s.blueRow_4 + s.blueRow_5 +s.blueRow_6; 
-      preUpSampleBuffer[i]=(osc_white_total/8.f) - s.prev_sample;
+      preUpSampleBuffer[i]=ampAdjust * ((osc_white_total/8.f) - s.prev_sample);
       s.prev_sample = osc_white_total/8.f;
 
       blueCounter+=1;
@@ -234,13 +236,15 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   }
   else if (osc == Noise::k_flag_violet){
    // 6.02db/octave high pass filter on white noise, use first order filter
+    const float ampAdjust = 1.99f;  // lets boost it some
+
     float preUpSampleBuffer [frames] = {0};
     float postUpSampleBuffer [frames *2] = {0};
     float postDownSampleBuffer [frames] = {0};
 
     // fill preUpsampleBuffer
     for (int i = 0; i < frames; i++){
-      preUpSampleBuffer[i] = s_Noise.violetFilter.process_fo(osc_white());
+      preUpSampleBuffer[i] = ampAdjust * s_Noise.violetFilter.process_fo(osc_white());
     }
 
     // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
@@ -258,6 +262,8 @@ void OSC_CYCLE(const user_osc_param_t * const params,
   }
   else{
     // grey
+    const float ampAdjust = 1.99f;  // lets boost it some
+
     float preUpSampleBuffer [frames] = {0};
     float postUpSampleBuffer [frames *2] = {0};
     float postDownSampleBuffer [frames] = {0};
@@ -270,7 +276,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
       intermediate = s_Noise.greyLPFilter.process_so(whiteNoise);
       intermediate += s_Noise.greyHP3Filter.process_so(s_Noise.greyHP2Filter.process_so(s_Noise.greyHP1Filter.process_so(whiteNoise)));
 
-      preUpSampleBuffer[i] = intermediate/2.f;
+      preUpSampleBuffer[i] = ampAdjust * (intermediate/2.f);
     }
 
     // upsample (2x, going from 48kHz to 96kHz), populate postUpsampleBuffer
